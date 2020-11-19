@@ -361,9 +361,15 @@
                         //实现化WebSocket对象，指定要连接的服务器地址与端口  建立连接
                         //等同于socket = new WebSocket("ws://localhost:8888/xxxx/im/25");
                         //var socketUrl="${request.contextPath}/im/"+$("#userId").val();
-                        var socketUrl =
-                            `ws://${window.location.host}/logsWS/${parseInt(Math.random() * (2000 + 1), 10)}`;
-                        console.log(socketUrl);
+
+                        var socketUrl = ``;
+                        if(window.location.protocol=="https:"){
+                            socketUrl = `wss://${window.location.host}/logsWS/${parseInt(Math.random() * (2000 + 1), 10)}`;
+                        }else{
+                            socketUrl = `ws://${window.location.host}/logsWS/${parseInt(Math.random() * (2000 + 1), 10)}`;
+                        }
+                        console.warn(socketUrl);
+
                         if (socket != null) {
                             socket.close();
                             socket = null;
