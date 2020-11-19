@@ -36,12 +36,14 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
+import org.springframework.web.socket.server.standard.ServerEndpointExporter;
 
 /**
  * @ClassName DBBackupConfig
@@ -53,7 +55,8 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter
 @EnableWebMvc
 @EnableScheduling
 @Configuration
-@ComponentScan("com.mxsky.dbbackup.controller")
+@ComponentScan("com.mxsky.dbbackup")
+@Import(cn.hutool.extra.spring.SpringUtil.class)
 public class DBBackupConfig extends WebMvcConfigurerAdapter {
 
     @Autowired
@@ -83,6 +86,11 @@ public class DBBackupConfig extends WebMvcConfigurerAdapter {
         registration.setName("mxAuthFilter");
         registration.setOrder(1);
         return registration;
+    }
+
+    @Bean
+    public ServerEndpointExporter serverEndpointExporter() {
+        return new ServerEndpointExporter();
     }
 
 }
