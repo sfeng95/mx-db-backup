@@ -101,10 +101,6 @@ public class DBCmdService {
             commands.add("/c");
         }
 
-        if(JarUtil.getSystemOsName().equals(SystemOSNameEnum.linux.getCode())){
-            commands.add("sh");
-            commands.add("/c");
-        }
 
         if(JarUtil.getSystemOsName().equals(SystemOSNameEnum.windows.getCode())){
             commands.add("mysqldump");
@@ -126,7 +122,7 @@ public class DBCmdService {
         commands.add("--net_buffer_length=16384");
         commands.add("--result-file="+dataFile);
 
-//        log.info( StringUtils.join(commands.toArray()," "));
+        log.info( StringUtils.join(commands.toArray()," "));
         return commands.toArray(new String[commands.size()]);
 
     }
@@ -148,10 +144,6 @@ public class DBCmdService {
             commands.add("/c");
         }
 
-        if(JarUtil.getSystemOsName().equals(SystemOSNameEnum.linux.getCode())){
-            commands.add("sh");
-            commands.add("/c");
-        }
 
         if(JarUtil.getSystemOsName().equals(SystemOSNameEnum.windows.getCode())){
             commands.add("mysql");
@@ -168,7 +160,7 @@ public class DBCmdService {
         }
         commands.add("<"+dataFile);
         //不打印log防止密码泄露
-        //log.info( StringUtils.join(commands.toArray()," "));
+        log.info( StringUtils.join(commands.toArray()," "));
         return commands.toArray(new String[commands.size()]);
     }
 

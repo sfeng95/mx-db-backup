@@ -26,7 +26,7 @@ public class AuthFilter  implements Filter {
     @Override
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain filterChain) throws IOException, ServletException {
         HttpServletRequest request = (HttpServletRequest) servletRequest;
-        if(request.getRequestURI().contains("login")){
+        if(request.getRequestURI().contains("login")||request.getRequestURI().contains("/taskRecord/dowloadLog")||request.getRequestURI().contains("/taskRecord/dowloadData")){
             filterChain.doFilter(servletRequest, servletResponse);
             return;
         }
