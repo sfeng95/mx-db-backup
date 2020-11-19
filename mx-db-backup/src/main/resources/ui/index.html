@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<!--
+  ~ /*
+  ~ Copyright [2020] [https://www.mxsky.com]
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~   http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  ~
+  ~ mx-db-backup采用APACHE LICENSE 2.0开源协议，您在使用过程中，需要注意以下几点：
+  ~
+  ~ 1.请不要删除和修改根目录下的LICENSE文件。
+  ~ 2.请不要删除和修改源码头部的版权声明。
+  ~ 3.请保留源码和相关描述文件的项目出处，作者声明等。
+  ~ 4.分发源码时候，请注明软件出处 https://gitee.com/mx-sky/mx-db-backup
+  ~ 5.在修改包名，模块名称，项目代码等时，请注明软件出处 https://gitee.com/mx-sky/mx-db-backup
+  ~ 6.这个项目可以商业使用，不需要授权联系
+  ~ 7.使用本项目前先备份好数据，请认真严格测试程序，如果使用本程序导致数据丢失，一切责任与本人无关
+  ~ 8.若您的项目无法满足以上几点，可申请商业授权，获取商业授权许可请联系邮箱 sfeng95@qq.com
+  ~  */
+  -->
+
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>木星 数据库备份还原助手</title>
+    <link rel="stylesheet" href="./css/element-ui.css">
+    <link rel="stylesheet" href="./css/fonts/element-icons.ttf">
+    <link rel="stylesheet" href="./css/fonts/element-icons.woff">
+    <link rel="stylesheet" type="text/css" href="./css/loaders.css" />
+
+    <script src="./js/vue.min.js"></script>
+    <script src="./js/element-ui.js"></script>
+    <script src="./js/axios.min.js"></script>
+    <script src="./js/qs.min.js"></script>
+    <script src="./js/moment.min.js"></script>
+
+    <style>
+        /*滚动条样式*/
+        .logContainer {
+            width: 80%;
+            margin-left: 10%;
+            height: 300px;
+            overflow-y: scroll;
+            background: #333;
+            color: #aaa;
+            padding: 10px;
+            margin-top: 30px;
+        }
+
+        .logContainer::-webkit-scrollbar {
+            width: 4px;
+            /*height: 4px;*/
+        }
+
+        .logContainer::-webkit-scrollbar-thumb {
+            border-radius: 10px;
+            -webkit-box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .logContainer::-webkit-scrollbar-track {
+            -webkit-box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
+            border-radius: 0;
+            background: rgba(0, 0, 0, 0.1);
+        }
+    </style>
+
+</head>
+
+<body>
+    <div id="mxapp">
+        <div id="loginBox" style="display: block;">
+            <el-row style="margin-top: 180px;" type="flex" justify="center">
+                <p style="color: #409eff;font-size: 1.5rem;font-weight: bolder;">木星数据库备份助手</p>
+            </el-row>
+            <el-row style="margin-top: 30px;" type="flex" justify="center">
+                <el-input style="width: 280px;" placeholder="请输入密码" v-model="loginPasswd" show-password></el-input>
+            </el-row>
+            <el-row style="margin-top: 30px;" type="flex" justify="center">
+                <el-button :loading="loginloading" @click="doLogin" style="width: 280px;" type="primary">登 录</el-button>
+            </el-row>
+        </div>
+        <el-tabs id="elTabs" style="display:none;" type="card" v-model="activeName" @tab-click="handleClick">
+            <el-tab-pane label="运行状态" name="runStatus">
+
+                <div style="width: 480px;margin: 0 auto;">
+                    <el-row>
+                        <p style="color: #585858;">任务状态：</p>
+                    </el-row>
+
+                    <el-row type="flex" justify="center" style="margin-top: 30px;">
+
+                        <div v-if="taskStatus.code==1" class="item-loader-container">
+                            <div class="la-timer la-2x">
+                                <div></div>
+                            </div>
+                        </div>
+
+
+                        <div v-if="taskStatus.code==3" class="item-loader-container">
+                            <div class="la-pacman la-2x">
+                                <div></div>
+                                <div></div>
+                                <div></div>
+                                <div></div>
+                                <div></div>
+                                <div></div>
+                            </div>
+                        </div>
+
+
+                        <div v-if="[4,5,7,8].includes(taskStatus.code)" class="item-loader-container">
+                            <div class="la-triangle-skew-spin la-2x">
+                                <div></div>
+                            </div>
+                        </div>
+
+
+                        <div v-if="taskStatus.code==6" class="item-loader-container">
+                            <div class="la-ball-clip-rotate la-2x">
+                                <div></div>
+                            </div>
+                        </div>
+
+
+                    </el-row>
+
+                    <el-row>
+                        <p v-html="taskStatus.msg" style="text-align: center;color: #ea1330;font-size: 1.5rem;"></p>
+                    </el-row>
+
+                    <el-row type="flex" justify="center" style="margin-top: 20px;">
+
+                        <el-button @click="taskStart" v-if="taskStatus.code==2" type="success">启动定时任务</el-button>
+                        <el-button @click="taskStop" v-if="taskStatus.code==1" type="danger">暂停定时任务</el-button>
+                        <el-button @click="taskExecute" v-if="taskStatus.code==1 || taskStatus.code==2" type="primary">
+                            立即执行
+                        </el-button>
+                        <el-button @click="taskCancelExecute" v-if="taskStatus.code==3" type="danger">停止执行</el-button>
+                        <el-button @click="upTaskStatus" v-if="[4,5,7,8].includes(taskStatus.code)" type="primary">我知道了
+                        </el-button>
+                    </el-row>
+                </div>
+                <div v-show="[3,4,5,6,7,8].includes(taskStatus.code)" ref="logContainer" class="logContainer">
+                </div>
+            </el-tab-pane>
+
+            <el-tab-pane label="数据库设置" name="dbBaseSet" style="width: 480px;margin: 0 auto;">
+                <el-form :model="dsEntity" label-width="120px">
+
+
+                    <el-form-item label="数据库类型">
+                        <el-select v-model="dsEntity.dbType" style="width: 100%;">
+                            <el-option label="mysql5.x" value="mysql5.x"></el-option>
+                            <el-option label="mysql8.x" value="mysql8.x"></el-option>
+                            <el-option label="Oracle" value="oracle"></el-option>
+                            <el-option label="SQLServer" disabled value="sqlserver"></el-option>
+                        </el-select>
+                        <div style="text-align: left;color: #909ca5;">暂时只支持mysql,oracle数据库</div>
+                    </el-form-item>
+
+                    <el-form-item label="数据库地址:">
+                        <el-input v-model="dsEntity.adress"></el-input>
+                    </el-form-item>
+
+                    <el-form-item label="数据库端口:">
+                        <el-input v-model="dsEntity.port"></el-input>
+                    </el-form-item>
+
+                    <el-form-item label="数据库账号:">
+                        <el-input v-model="dsEntity.username"></el-input>
+                    </el-form-item>
+
+                    <el-form-item label="数据库密码:">
+                        <el-input show-password v-model="dsEntity.password"></el-input>
+                        <div style="text-align: left;color: #909ca5;">新增时需要填写密码。修改时不返回密码，如果你不修改密码可以留空</div>
+                    </el-form-item>
+
+                    <el-form-item label="指定数据库:">
+                        <el-input v-model="dsEntity.database"></el-input>
+                        <div style="text-align: left;color: #909ca5;">可以为空，如果不指定具体数据库，将会全库备份</div>
+                    </el-form-item>
+
+                    <el-form-item>
+                        <el-button :loading="dsSaveloading" style="width: 100%;" type="primary" @click="onDSSubmit">保 存
+                        </el-button>
+                    </el-form-item>
+
+                </el-form>
+            </el-tab-pane>
+
+
+            <el-tab-pane label="定时器设置" name="timerSet" style="width: 480px;margin: 0 auto;">
+
+                <el-form :model="scdEntity" label-width="120px" style="margin-top: 80px;">
+                    <el-form-item label="表达式:">
+                        <el-input v-model="scdEntity.cron"></el-input>
+                    </el-form-item>
+
+                    <el-form-item label="示例:">
+                        <div style="text-align: center;color: #585858;">每天凌晨3点执行：<span style="color: #ea4413;">0 0 3 * *
+                                ? *</span></div>
+                        <div style="text-align: center;color: #585858;">每月最后一天执行：<span style="color: #ea4413;">0 0 0 L *
+                                ?</span></div>
+                        <div style="text-align: center;color: #585858;">每月15日上午10:15触发 ：<span style="color: #ea4413;">0
+                                15 10 15 * ?</span></div>
+                    </el-form-item>
+
+                    <el-form-item>
+                        <el-button :loading="tsSaveloading" style="width: 100%;" type="primary" @click="onScdSubmit">保
+                            存</el-button>
+                    </el-form-item>
+                </el-form>
+
+            </el-tab-pane>
+
+            <el-tab-pane label="备份文件列表" name="fileList">
+
+                <el-table :data="taskRecordData" style="width: 100%">
+                    <el-table-column :formatter="dateFormatter" fixed prop="backupTime" label="备份时间">
+                    </el-table-column>
+                    <el-table-column prop="backupDuration" label="备份耗时">
+                        <template slot-scope="scope">
+                            {{scope.row.backupDuration}}秒
+                        </template>
+                    </el-table-column>
+                    <el-table-column :formatter="fileSizeFormatter" prop="dataFileSize" label="文件大小">
+                    </el-table-column>
+                    <el-table-column prop="status" label="状态">
+                        <template slot-scope="scope">
+                            <el-tag :type="scope.row.status === 1 ? 'success' : 'danger'" disable-transitions>
+                                {{scope.row.status === 1 ? '成功' : '失败'}}</el-tag>
+                        </template>
+                    </el-table-column>
+                    <el-table-column align="center" fixed="right" label="操作">
+                        <template slot-scope="scope">
+                            <el-button @click="dowloadData(scope.row)" type="text" size="small">下载备份数据</el-button>
+                            <el-button @click="dowloadLog(scope.row)" type="text" size="small">下载日志文件</el-button>
+                            <el-button @click="deleteTask(scope.row)" type="text" size="small">删除备份和日志</el-button>
+                            <el-button @click="restoreDB(scope.row)" type="text" size="small">还原到此次备份数据</el-button>
+                        </template>
+                    </el-table-column>
+                </el-table>
+
+            </el-tab-pane>
+        </el-tabs>
+
+
+    </div>
+    <script>
+        axios.defaults.timeout = 20000
+        axios.defaults.withCredentials = false;
+        axios.defaults.headers.post['Content-Type'] = 'application/json'
+
+        axios.interceptors.request.use(function (config) {
+            let mxToken = localStorage.getItem("mxToken");
+            config.headers['MX-TOKEN'] = mxToken;
+            return config
+        }, function (error) {
+            return Promise.reject(error)
+        })
+
+        axios.interceptors.response.use(
+            response => {
+                return response;
+            },
+            error => {
+                if (error.response.status == 401) {
+                    document.getElementById("elTabs").style.display = "none"//不显示
+                    document.getElementById("loginBox").style.display = "block"//显示
+                    return Promise.reject(error);
+                }
+                if (error.response) {
+                    ELEMENT.Message.error(error.response.data.msg);
+                }
+                return Promise.reject(error);
+            }
+        )
+        new Vue({
+            el: '#mxapp',
+            data() {
+                return {
+                    loginPasswd: "",
+                    isLogin: false,
+
+
+                    loginloading: false,
+                    dsSaveloading: false,
+                    tsSaveloading: false,
+                    tsStartloading: false,
+                    tsStoploading: false,
+                    tsExecuteloading: false,
+                    tsCelExecuteloading: false,
+
+
+
+                    taskStatus: {
+                        code: 1,
+                        msg: '已激活，等待指定时间执行'
+                    },
+                    dsEntity: {
+                        dsId: 27321,
+                        name: '',
+                        dbType: 'mysql5.x',
+                        adress: '127.0.0.1',
+                        port: '3306',
+                        username: 'root',
+                        password: 'root',
+                        database: '',
+                        serviceName: ''
+                    },
+                    scdEntity: {
+                        dsId: 27321,
+                        sId: 27002,
+                        cron: '0 0 3 * * ? *'
+                    },
+                    activeName: 'runStatus',
+                    taskRecordData: [],
+                    executeLogs: ""
+                }
+            },
+            created() {
+                this.$nextTick(() => {
+                    this.getDsData();
+                    this.getScdData();
+                    this.getTaskStatus();
+                    this.getTaskRecordData();
+                })
+            },
+            mounted() {
+                this.$nextTick(() => {
+                    this.initWS();
+                    setInterval(this.getTaskStatus, 5000)
+
+                    let mxToken = localStorage.getItem("mxToken");
+                    if (mxToken != null || mxToken != '') {
+                        document.getElementById("elTabs").style.display = "block"
+                        document.getElementById("loginBox").style.display = "none"
+                    }
+
+                })
+
+            },
+            methods: {
+                initWS() {
+                    let that = this;
+                    var socket;
+                    if (typeof (WebSocket) == "undefined") {
+                        alert("您的浏览器不支持WebSocket");
+                    } else {
+                        //实现化WebSocket对象，指定要连接的服务器地址与端口  建立连接
+                        //等同于socket = new WebSocket("ws://localhost:8888/xxxx/im/25");
+                        //var socketUrl="${request.contextPath}/im/"+$("#userId").val();
+                        var socketUrl =
+                            `ws://${window.location.host}/logsWS/${parseInt(Math.random() * (2000 + 1), 10)}`;
+                        console.log(socketUrl);
+                        if (socket != null) {
+                            socket.close();
+                            socket = null;
+                        }
+                        socket = new WebSocket(socketUrl);
+                        //打开事件
+                        socket.onopen = function () {
+                            console.log("websocket已打开");
+                        };
+                        //获得消息事件
+                        socket.onmessage = function (msg) {
+                            var p = document.createElement("p");
+                            p.innerHTML = msg.data;
+                            that.$refs.logContainer.appendChild(p);
+                            console.log(msg.data);
+                        };
+                        //关闭事件
+                        socket.onclose = function () {
+                            console.log("websocket已关闭");
+                        };
+                        //发生了错误事件
+                        socket.onerror = function () {
+                            console.log("websocket发生了错误");
+                        }
+                    }
+                },
+                dateFormatter(row, column) {
+                    return moment(row.backupTime).format("YYYY-MM-DD HH:mm:ss")
+                },
+                fileSizeFormatter(row, column) {
+                    let size = row.dataFileSize;
+                    size = size / 1024 / 1024;
+                    return size.toFixed(2) + 'MB';
+                },
+                doLogin() {
+                    let that = this;
+                    that.loginloading = true;
+                    axios.post(`/xjdb-backup/login?password=${that.loginPasswd}`)
+                        .then(function (response) {
+                            that.$message({
+                                message: '登录成功',
+                                type: 'success'
+                            });
+                            localStorage.setItem("mxToken", response.data.data);
+                            that.loginloading = false;
+                            document.getElementById("elTabs").style.display = "block"
+                            document.getElementById("loginBox").style.display = "none"
+                            that.getTaskStatus();
+                        }).catch(() => {
+                            that.loginloading = false;
+                        })
+                },
+                taskStart() {
+                    let that = this;
+                    that.tsStartloading = true;
+                    axios.post('/xjdb-backup/schedule/start')
+                        .then(function (response) {
+                            that.$message({
+                                message: '操作成功',
+                                type: 'success'
+                            });
+                            that.tsStartloading = false;
+                            this.getTaskStatus();
+                        }).catch(() => {
+                            this.getTaskStatus();
+                            that.tsStartloading = false;
+                        })
+                },
+                taskStop() {
+                    let that = this;
+                    that.tsStoploading = true;
+                    axios.post('/xjdb-backup/schedule/stop')
+                        .then(function (response) {
+                            that.$message({
+                                message: '操作成功',
+                                type: 'success'
+                            });
+                            that.tsStoploading = false;
+                            this.getTaskStatus();
+                        }).catch(() => {
+                            this.getTaskStatus();
+                            that.tsStoploading = false;
+                        })
+                },
+                taskExecute() {
+                    let that = this;
+                    that.getTaskStatus();
+                    that.tsExecuteloading = true;
+                    axios.post('/xjdb-backup/schedule/execute')
+                        .then(function (response) {
+                            that.$message({
+                                message: response.data.data,
+                                type: 'success'
+                            });
+                            that.tsExecuteloading = false;
+                            this.getTaskStatus();
+                        }).catch(() => {
+                            this.getTaskStatus();
+                            that.tsExecuteloading = false;
+                        })
+                },
+                upTaskStatus() {
+                    let that = this;
+                    axios.post('/xjdb-backup/schedule/upStatus')
+                        .then(function (response) {
+                            that.getTaskStatus();
+                        })
+                },
+                taskCancelExecute() {
+                    let that = this;
+                    that.tsCelExecuteloading = true;
+                    axios.post('/xjdb-backup/schedule/cancelExecute')
+                        .then(function (response) {
+                            that.$message({
+                                message: '操作成功',
+                                type: 'success'
+                            });
+                            that.tsCelExecuteloading = false;
+                            this.getTaskStatus();
+                        }).catch(() => {
+                            this.getTaskStatus();
+                            that.tsCelExecuteloading = false;
+                        })
+                },
+                getTaskStatus() {
+                    let that = this;
+                    axios.get(`/xjdb-backup/schedule/status`)
+                        .then(function (response) {
+                            let data = response.data.data;
+                            if (data != null) {
+                                that.taskStatus = data;
+                            }
+                        })
+                },
+                getDsData() {
+                    let that = this;
+                    axios.get(`/xjdb-backup/dbConfig/info?dsId=${this.dsEntity.dsId}`)
+                        .then(function (response) {
+                            let data = response.data.data;
+                            if (data != null) {
+                                that.dsEntity = data;
+                            }
+                        })
+                },
+                getScdData() {
+                    let that = this;
+                    axios.get(`/xjdb-backup/schedule/info?sId=${this.scdEntity.sId}`)
+                        .then(function (response) {
+                            let data = response.data.data;
+                            if (data != null) {
+                                that.scdEntity = data;
+                            }
+                        })
+                },
+                getTaskRecordData() {
+                    let that = this;
+                    axios.get(`/xjdb-backup/taskRecord/list`)
+                        .then(function (response) {
+                            let data = response.data.data;
+                            if (data != null) {
+                                that.taskRecordData = data;
+                            }
+                        })
+                },
+                onDSSubmit() {
+                    let that = this;
+                    that.dsSaveloading = true;
+                    axios.post('/xjdb-backup/dbConfig/saveOrUpdate', that.dsEntity)
+                        .then(function (response) {
+                            that.$message({
+                                message: '保存成功',
+                                type: 'success'
+                            });
+                            that.dsSaveloading = false;
+                        }).catch(() => {
+                            that.dsSaveloading = false;
+                        })
+                },
+                onScdSubmit() {
+                    let that = this;
+                    that.tsSaveloading = true;
+                    axios.post('/xjdb-backup/schedule/saveOrUpdate', that.scdEntity)
+                        .then(function (response) {
+                            that.$message({
+                                message: '保存成功',
+                                type: 'success'
+                            });
+                            that.tsSaveloading = false;
+                        }).catch(() => {
+                            that.tsSaveloading = false;
+                        })
+                },
+                handleClick(tab, event) {
+                    this.getTaskRecordData();
+                    this.getTaskStatus();
+                },
+                dowloadData(row) {
+                    self.location.href = `/xjdb-backup/taskRecord/dowloadData?rId=${row.rId}`;
+                },
+                dowloadLog(row) {
+                    self.location.href = `/xjdb-backup/taskRecord/dowloadLog?rId=${row.rId}`;
+                },
+                restoreDB(row) {
+                    let that = this;
+
+                    that.$confirm('是否进行数据还原操作？', '提示', {
+                        confirmButtonText: '确定还原',
+                        cancelButtonText: '取消操作',
+                        type: 'warning',
+                        center: true
+                    }).then(() => {
+                        that.getTaskStatus();
+                        that.$confirm('还原前是否需要备份现在的数据？', '提示', {
+                            confirmButtonText: '备份',
+                            cancelButtonText: '不备份',
+                            type: 'warning',
+                            distinguishCancelAndClose: true,
+                            center: true
+                        }).then(() => {
+                            axios.post(`/xjdb-backup/dbReStore?rId=${row.rId}&backup=true`)
+                                .then(function (response) {
+                                    that.$message({
+                                        message: '操作成功',
+                                        type: 'success'
+                                    });
+                                    that.activeName = 'runStatus';
+                                    that.getDsData();
+                                })
+                        }).catch(() => {
+                            axios.post(`/xjdb-backup/dbReStore?rId=${row.rId}&backup=false`)
+                                .then(function (response) {
+                                    that.$message({
+                                        message: '操作成功',
+                                        type: 'success'
+                                    });
+                                    that.activeName = 'runStatus';
+                                    that.getDsData();
+                                })
+                        });
+
+
+                    }).catch(() => {
+                        that.$message({
+                            type: 'info',
+                            message: '已取消操作'
+                        });
+                    });
+
+
+                },
+                deleteTask(row) {
+                    let that = this;
+                    this.$confirm('此操作将永久删除该文件, 是否继续?', '提示', {
+                        confirmButtonText: '确定',
+                        cancelButtonText: '取消',
+                        type: 'warning',
+                        center: true
+                    }).then(() => {
+                        axios.post(`/xjdb-backup/taskRecord/delete?rId=${row.rId}`)
+                            .then(function (response) {
+                                that.$message({
+                                    message: '删除成功',
+                                    type: 'success'
+                                });
+                                that.getTaskRecordData();
+                            })
+                    }).catch(() => {
+                        that.$message({
+                            type: 'info',
+                            message: '已取消删除'
+                        });
+                    });
+
+
+                }
+            },
+
+
+
+        })
+    </script>
+
+
+</body>
+
+</html>

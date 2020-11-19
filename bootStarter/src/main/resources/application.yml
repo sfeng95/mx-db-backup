@@ -1,0 +1,12 @@
+server:
+    port: 7080
+
+spring:
+  h2:
+    console:
+      enabled: true
+
+
+mxdbBackup:
+  enableLogin: true
+  password: 0
